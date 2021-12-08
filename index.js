@@ -1,20 +1,35 @@
 const express = require("express")
+const { MongoClient } = require('mongodb'); //{} signifies that it is an object 
+const cors = require('cors');
 
-let {destinations} = require('./db')
+//const fetch = require('node-fetch');
 
-const cors = require('cors')
+//let {destinations} = require('./db')
 
-const fetch = require('node-fetch')
+
 
 //console.log(destinations)
 
-const {generateUniqueId}= require('./services')
+const {generateUniqueId, getUnsplashPhoto}= require('./services')
 
 const server = express();
 //parse the any body that comes in json
 server.use(express.json())
 
 server.use(cors())
+
+//MongoDB set yo
+const MONGODB_URL = 'mongodb+srv://jedi:jedi123@cluster0.5uu3o.mongodb.net/myFirstDatabase?retryWrites=true&w=majority';
+const client = new MongoClient(MONGODB_URL);
+
+client.connect()
+.then(() => {
+    const db = client.db("first_mongodb");  
+
+    const destinations = db.collection("destinations")
+    destinations.insertOne({name: "Paris"})
+
+
 
 //console.log(process);
 
@@ -39,12 +54,13 @@ server.post("/destinations", async (req, res)=>{
 
     const dest = { id: generateUniqueId(), name, location };
 
-    const UNSPLASH_URL = `https://api.unsplash.com/photos/random?client_id=-qskuY1xYZ7hVsxKry6wDJRIEhAzVyjk1sswgr5Lcdc&q=${name}${location}`
+    dest.photo = await getUnsplashPhoto({name, location})
+    // const UNSPLASH_URL = `https://api.unsplash.com/photos/random?client_id=-qskuY1xYZ7hVsxKry6wDJRIEhAzVyjk1sswgr5Lcdc&query=${name}${location}`
 
-    const fetchRes = await fetch(UNSPLASH_URL);
-    const data = await fetchRes.json()
+    // const fetchRes = await fetch(UNSPLASH_URL);
+    // const data = await fetchRes.json()
 
-    dest.photo = data.urls.small;
+    // dest.photo = data.urls.small;
 
     if (description && description.length !==0) {
         dest.description = description;
@@ -55,14 +71,14 @@ server.post("/destinations", async (req, res)=>{
 })
 
 server.get("/destinations", (req, res) => {
+    console.log('destinations', destinations)
    res.send(destinations);
 })
 
 //put => edit 
-server.put("/destinations/:id", (req, res)=>{
+server.put("/destinations/", async (req, res)=>{
 
-
-    const {name, location, photo, description} = req.body
+    const { id, name, location, description } = req.body
 
     if(id ===undefined) {
         return res.status(400).json({ message: "id is required" })
@@ -78,19 +94,21 @@ server.put("/destinations/:id", (req, res)=>{
 
     for(const dest of destinations) {
         if(dest.id ===id) {
-            // if(name || location){
-            //     const UNSPLASH_URL = `https://api.unsplash.com/photos/random?client_id=H1u5tbyFY_ziw-O82Ll_5WLww9Ar7VHS_h-SqbIBDfQ&q=${name} ${location}`
-            //     dest.photo = UNSPLASH_URL        
-            // }
+
             if(name !== undefined) {
                 dest.name = name;
             }
             if(location !==undefined) {
                 dest.location = location;
             }
-            if(photo!==undefined) {
-                dest.photo = photo;
+
+            if(name!== undefined || location !== undefined) {
+                dest.photo = await getUnsplashPhoto({
+                    name: dest.name,
+                    location: dest.location
+                })
             }
+
             if(description !== undefined) {
                 dest.description = description
             }
@@ -123,3 +141,5 @@ server.delete("/destinations/:id", (req,res)=>{
 
 
 })
+
+});
